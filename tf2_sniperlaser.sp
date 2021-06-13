@@ -20,72 +20,59 @@ int g_iDotController[MAXPLAYERS + 1];
 	Sourcemod SDK Function
 ****************************/
 
-public Plugin myinfo =
-{
-	name = "[TF2] Sniper Laser Redux",
-	author = "RetroTV",
+public Plugin myinfo = {
+	name 		= "[TF2] Sniper Laser Redux",
+	author 		= "RetroTV",
 	description = "Sniper rifles emit lasers redux",
-	version = "0.1",
-	url = ""
+	version 	= "0.1",
+	url 		= ""
 };
 
 // 플러그인 시발점
-public void OnPluginStart()
-{
+public void OnPluginStart() {
 	// CreateConVar(char[] name, char[] defaultValue, char[] description, int flags, boolean hasMin, float min, boolea hasMax, float max)
 	g_cvarLaserEnabled = CreateConVar("sniperlaser_enabled", "1", "Sniper rifles emit lasers", _, true, 0.0, true, 1.0);
-	g_cvarLaserRED = CreateConVar("sniperlaser_color_red", "255 0 0", "Sniper laser color RED");
-	g_cvarLaserBLU = CreateConVar("sniperlaser_color_blu", "0 0 255", "Sniper laser color BLUE");
+	g_cvarLaserRED 	   = CreateConVar("sniperlaser_color_red", "255 0 0", "Sniper laser color RED");
+	g_cvarLaserBLU     = CreateConVar("sniperlaser_color_blu", "0 0 255", "Sniper laser color BLUE");
 	
 	// 클라이언트가 서버에 접속할 때마다 전역 변수를 세팅한다
-	for (int i = 1; i <= MaxClients; i++)
-	{
+	for (int i = 1; i <= MaxClients; i++) {
 		OnClientPutInServer(i);
 	}
 }
 
 // 클라이언트가 서버에 접속할 때, 동작하는 이벤트
-public void OnClientPutInServer(int client)
-{
+public void OnClientPutInServer(int client) {
+	
 	// INVALID_ENT_REFERENCE: Entity 불일치를 확인하기 위한 값
-	g_iEyeProp[client] = INVALID_ENT_REFERENCE;
-	g_iSniperDot[client] = INVALID_ENT_REFERENCE;
+	g_iEyeProp[client]       = INVALID_ENT_REFERENCE;
+	g_iSniperDot[client]     = INVALID_ENT_REFERENCE;
 	g_iDotController[client] = INVALID_ENT_REFERENCE;
 }
 
 // Entity가 생성될 때, 동작하는 이벤트
-public void OnEntityCreated(int entity, const char[] classname)
-{
-	if (StrEqual(classname, "env_sniperdot") && g_cvarLaserEnabled.BoolValue)
-	{
+public void OnEntityCreated(int entity, const char[] classname) {
+	if (g_cvarLaserEnabled.BoolValue && StrEqual(classname, "env_sniperdot")) {
 		SDKHook(entity, SDKHook_SpawnPost, SpawnPost);
 	}
 }
 
 // 서버 프레임마다 호출되는 이벤트
-public void OnGameFrame()
-{
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if(!IsClientInGame(i))
-		{
+public void OnGameFrame() {
+	for (int i = 1; i <= MaxClients; i++) 	{
+		if(!IsClientInGame(i)) {
 			continue;
 		}
 			
 		int env_sniperdot = EntRefToEntIndex(g_iSniperDot[i]);
 		int dotController = EntRefToEntIndex(g_iDotController[i]);
 		
-		if(env_sniperdot > 0 && dotController > 0)
-		{
+		if(env_sniperdot > 0 && dotController > 0) {
 			float dotPos[3]; GetEntPropVector(env_sniperdot, Prop_Send, "m_vecOrigin", dotPos);
 			DispatchKeyValueVector(dotController, "origin", dotPos);
-		}
-		else
-		{
-			if(env_sniperdot <= 0 && dotController > 0)
-			{
+		} else {
+			if(env_sniperdot <= 0 && dotController > 0) {
 				DispatchKeyValue(dotController, "origin", "99999 99999 99999");
-				
 				SetVariantString("OnUser1 !self:kill::0.1:1");
 				AcceptEntityInput(dotController, "AddOutput");
 				AcceptEntityInput(dotController, "FireUser1");
@@ -96,40 +83,35 @@ public void OnGameFrame()
 	}
 }
 
-
-
 /*******************
 	User Function
 *******************/
 
-public Action SpawnPost(int entity)
-{
+public Action SpawnPost(int entity) {
+	
 	// 다음 프레임 후킹
-	RequestFrame(SpawnPostPost, entity);	
+	RequestFrame(SetLaser, entity);	
 }
 
-public void SpawnPostPost(int entity)
-{
-	if (IsValidEntity(entity))
-	{
+public void SetLaser(int entity) {
+	if (IsValidEntity(entity)) {
 		int client = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 		
-		if(client > 0 && client <= MaxClients && IsClientInGame(client))
-		{
-			if(GameRules_GetProp("m_bPlayingMannVsMachine") && TF2_GetClientTeam(client) != TFTeam_Red)
+		if(client > 0 && client <= MaxClients && IsClientInGame(client)) {
+			if(GameRules_GetProp("m_bPlayingMannVsMachine") && TF2_GetClientTeam(client) != TFTeam_Red) {
 				return;
+			}
 			
 			float rgb[3];
-			
 			char strrgb[PLATFORM_MAX_PATH];
 		
-			switch(TF2_GetClientTeam(client))
-			{
+			switch(TF2_GetClientTeam(client)) {
 				case TFTeam_Red:  g_cvarLaserRED.GetString(strrgb, PLATFORM_MAX_PATH);
 				case TFTeam_Blue: g_cvarLaserBLU.GetString(strrgb, PLATFORM_MAX_PATH);
 			}
 			
 			char rgbExploded[3][16];
+			
 			ExplodeString(strrgb, " ", rgbExploded, sizeof(rgbExploded), sizeof(rgbExploded[]));
 			
 			rgb[0] = StringToFloat(rgbExploded[0]);
@@ -141,12 +123,14 @@ public void SpawnPostPost(int entity)
 		
 			// color controls the color and is for color only.//
 			int color = CreateEntityByName("info_particle_system");
+			
 			DispatchKeyValue(color, "targetname", name);
 			DispatchKeyValueVector(color, "origin", rgb);
 			DispatchSpawn(color);
 			
 			// Start of beam -> parented to client.
 			int a = CreateEntityByName("info_particle_system");
+			
 			DispatchKeyValue(a, "effect_name", "laser_sight_beam");
 			DispatchKeyValue(a, "cpoint2", name);
 			DispatchSpawn(a);
@@ -159,7 +143,9 @@ public void SpawnPostPost(int entity)
 			
 			// Dot controller, set as controlpointent on beam
 			int dotController = CreateEntityByName("info_particle_system");
-			float dotPos[3]; GetEntPropVector(entity, Prop_Send, "m_vecOrigin", dotPos);
+			float dotPos[3];
+			
+			GetEntPropVector(entity, Prop_Send, "m_vecOrigin", dotPos);
 			DispatchKeyValueVector(dotController, "origin", dotPos);
 			DispatchSpawn(dotController);
 			
@@ -174,29 +160,25 @@ public void SpawnPostPost(int entity)
 			AcceptEntityInput(color, "AddOutput");
 			AcceptEntityInput(color, "FireUser1");
 			
-			g_iEyeProp[client]   = EntIndexToEntRef(a);
-			g_iSniperDot[client] = EntIndexToEntRef(entity);
+			g_iEyeProp[client]       = EntIndexToEntRef(a);
+			g_iSniperDot[client]     = EntIndexToEntRef(entity);
 			g_iDotController[client] = EntIndexToEntRef(dotController);
 			
-			// Hide original dot.
+			// 원본 레이저 도트 숨김
 			SDKHook(entity, SDKHook_SetTransmit, OnDotTransmit);
 		}
 	}
 }
 
-public Action OnDotTransmit(int entity, int client)
-{
+public Action OnDotTransmit(int entity, int client) {
 	return Plugin_Handled;
 }
 
-// TF2_OnConditionRemoved 부분을 고려해 볼 것, 현재 클래식 저격총은 레이저 프롭이 남는 문제가 있음
-public void TF2_OnConditionRemoved(int client, TFCond condition)
-{
-	if(TF2_GetPlayerClass(client) == TFClass_Sniper && condition == TFCond_Slowed)
-	{
+public void TF2_OnConditionRemoved(int client, TFCond condition) {
+	if(TF2_GetPlayerClass(client) == TFClass_Sniper && condition == TFCond_Slowed) {		
 		int iEyeProp = EntRefToEntIndex(g_iEyeProp[client])
-		if(iEyeProp != INVALID_ENT_REFERENCE)
-		{
+		
+		if(iEyeProp != INVALID_ENT_REFERENCE) {
 			AcceptEntityInput(iEyeProp, "ClearParent");
 			AcceptEntityInput(iEyeProp, "Stop");
 			
